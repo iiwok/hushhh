@@ -2,17 +2,31 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Textarea } from "@/components/ui/textarea"
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
+import KofiWidget from './components/KofiWidget'
 
 // Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+// Add this helper function at the top of your file
+const formatMoney = (amount: number) => {
+  return amount.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+}
+
+interface Secret {
+  text: string
+  value: number
+}
+
 export default function Component() {
-  const [messages, setMessages] = useState<{ text: string, value: number }[]>([])
+  const [messages, setMessages] = useState<Secret[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -63,15 +77,31 @@ export default function Component() {
     if (newMessage.trim() && !isSubmitting) {
       setIsSubmitting(true)
       try {
-        const { redactedText, financialValue, analysis } = await handleSecret(newMessage.trim())
+        const { redactedText, financialValue } = await handleSecret(newMessage.trim())
+        
+        const { error: supabaseError } = await supabase
+          .from('secrets')
+          .insert([{
+            secret_text: redactedText,
+            financial_value: financialValue
+          }])
+
+        if (supabaseError) throw supabaseError
+
         setMessages(prev => [...prev, { text: redactedText, value: financialValue }])
         setNewMessage('')
-      } catch (error) {
-        console.error('Failed to process secret:', error)
-        // Optionally add error handling UI here
+      } catch (err) {
+        console.error('Failed to process or save secret:', err)
       } finally {
         setIsSubmitting(false)
       }
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmit(e as any)
     }
   }
 
@@ -94,8 +124,8 @@ export default function Component() {
       />
 
       {/* Content - now relative to appear above background */}
-      <div className="relative z-10 mx-auto max-w-md p-4">
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+      <div className="relative z-10 mx-auto max-w-md p-4 mb-10">
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-20">
           <div className="border-b p-4">
             <div className="font-mono text-center space-y-2">
               <h1 className="text-2xl font-bold tracking-wider">KEEP THE RECEIPTS</h1>
@@ -122,9 +152,9 @@ export default function Component() {
                 <div key={index} className="border-b border-dotted pb-2">
                   <div className="flex justify-between">
                     <span>#{(index + 1).toString().padStart(3, '0')}</span>
-                    <span>${message.value.toFixed(2)}</span>
+                    <span>${formatMoney(message.value)}</span>
                   </div>
-                  <p className="break-words">{message.text}</p>
+                  <p className="break-words">{message.text.replace(/['"]/g, '')}</p>
                 </div>
               ))
             )}
@@ -134,7 +164,7 @@ export default function Component() {
             <div className="font-mono p-4 bg-white">
               <div className="flex justify-between items-center">
                 <div className="font-bold">TOTAL</div>
-                <div className="font-bold">${totalValue.toFixed(2)}</div>
+                <div className="font-bold">${formatMoney(totalValue)}</div>
               </div>
               <div className="text-xs text-gray-500 mt-1">
                 {messages.length} secret{messages.length !== 1 ? 's' : ''} confessed
@@ -143,24 +173,25 @@ export default function Component() {
           </div>
 
           <form onSubmit={handleSubmit} className="p-4 border-t bg-gray-50">
-            <div className="flex gap-2">
-              <Input
-                type="text"
+            <div className="flex flex-col gap-2">
+              <Textarea
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="What's your secret's worth?"
-                className="font-mono"
+                className="font-mono resize-none min-h-[60px]"
                 disabled={isSubmitting}
+                rows={3}
               />
               <Button 
                 type="submit" 
                 disabled={isSubmitting || !newMessage.trim()}
-                className={isSubmitting ? 'cursor-not-allowed' : ''}
+                className={`${isSubmitting ? 'cursor-not-allowed' : ''} w-full`}
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing
+                    Calculating your secret's worth
                   </>
                 ) : (
                   'Add'
@@ -170,62 +201,30 @@ export default function Component() {
           </form>
         </div>
       </div>
+
+      {/* Ko-fi Widget */}
+      <KofiWidget />
     </div>
   )
 }
 
 async function handleSecret(text: string) {
-  try {
-    // First redact PII
-    const redactResponse = await fetch('/api/redact-pii', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
-    })
+  const redactResponse = await fetch('/api/redact-pii', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text })
+  })
+  const { redactedText } = await redactResponse.json()
 
-    if (!redactResponse.ok) {
-      const error = await redactResponse.json()
-      throw new Error(error.message || 'Failed to redact PII')
-    }
+  const analysisResponse = await fetch('/api/analyze-secret', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ secret: redactedText })
+  })
+  const { FinancialValue } = await analysisResponse.json()
 
-    const redactData = await redactResponse.json()
-    
-    if (!redactData.redactedText) {
-      throw new Error('No redacted text returned')
-    }
-
-    // Then analyze the redacted secret
-    const analysisResponse = await fetch('/api/analyze-secret', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret: redactData.redactedText })
-    })
-
-    if (!analysisResponse.ok) {
-      const error = await analysisResponse.json()
-      throw new Error(error.message || 'Failed to analyze secret')
-    }
-
-    const analysis = await analysisResponse.json()
-
-    // Save to Supabase
-    const { error } = await supabase
-      .from('secrets')
-      .insert([
-        { secret_text: redactData.redactedText, financial_value: analysis.FinancialValue }
-      ])
-
-    if (error) {
-      throw new Error('Failed to save secret to database')
-    }
-
-    return {
-      redactedText: redactData.redactedText,
-      financialValue: analysis.FinancialValue,
-      analysis: analysis.Analysis
-    }
-  } catch (error) {
-    console.error('Error processing secret:', error)
-    throw error
+  return {
+    redactedText,
+    financialValue: FinancialValue
   }
 }

@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       messages: [
         {
           role: "system",
-          content: "You are a financial analyst. You must analyze secrets and provide numerical valuations. Always respond with exact numbers and detailed breakdowns in JSON format."
+          content: "You are a financial analyst. Your task is to calculate the financial cost of secrets based on their implications. Assume all impacts are costs (not benefits) unless explicitly stated otherwise. Always respond with exact numbers and a detailed breakdown in JSON format."
         },
         {
           role: "user",
@@ -22,34 +22,39 @@ export async function POST(request: Request) {
 
 Secret: "${secret}"
 
-Calculate and provide ALL of these specific values in your JSON response:
-1. RevenueImpact (in USD)
-2. MarketImpact (in USD)
-3. LegalCosts (in USD)
-4. ProtectionCosts (in USD)
-5. DamageControlCosts (in USD)
-6. ScarcityFactor (scale 0-10)
-7. MarketDemandFactor (scale 0-10)
+### Guidelines:
+1. All monetary impacts (RevenueImpact, MarketImpact, LegalCosts, ProtectionCosts, DamageControlCosts) must be zero or positive.
+2. ScarcityFactor and MarketDemandFactor are non-negative multipliers for BaseValue, not standalone contributors to FinancialValue.
 
-Calculate the final FinancialValue using this exact formula:
-BaseValue = RevenueImpact + MarketImpact + LegalCosts + ProtectionCosts
+### Calculation:
+1. BaseValue = RevenueImpact + MarketImpact + LegalCosts + ProtectionCosts + DamageControlCosts (in USD)
+2. Multiplier = (ScarcityFactor / 10) * (MarketDemandFactor / 10)
+3. FinancialValue = BaseValue * (1 + Multiplier)
 
 ### Output:
-Provide the result in JSON format with:
+Provide the response in JSON format with:
 - "FinancialValue": The calculated value of the secret (as a number).
-- "Analysis": A brief explanation of the factors considered.`
-        }
+- "Analysis": A brief explanation of the factors considered.` 
+}
       ],
       temperature: 0.7,
       response_format: { type: "json_object" }
     })
 
-    const result = JSON.parse(response.choices[0].message.content)
-    return NextResponse.json(result)
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to analyze secret' },
-      { status: 500 }
-    )
+    if (!response.choices[0]?.message?.content) {
+        throw new Error('No response content from OpenAI')
+      }
+  
+      const result = JSON.parse(response.choices[0].message.content)
+      return NextResponse.json(result)
+    } catch (err) {
+      console.error('Analysis error:', err)
+      return NextResponse.json(
+        { error: 'Failed to analyze secret', details: err instanceof Error ? err.message : 'Unknown error' },
+        { status: 500 }
+      )
+    }
   }
-}
+  
+  export const runtime = 'edge'
+  export const dynamic = 'force-dynamic'
