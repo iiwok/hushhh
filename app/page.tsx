@@ -75,58 +75,100 @@ export default function Component() {
     }
   }
 
+  // Calculate total
+  const totalValue = messages.reduce((sum, message) => sum + message.value, 0)
+
   return (
-    <div className="mx-auto max-w-md p-4">
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-        <div className="border-b p-4">
-          <div className="font-mono text-center space-y-2">
-            <h1 className="text-2xl font-bold tracking-wider">KEEP THE RECEIPTS</h1>
-            <div className="text-sm">
-              <p>DIGITAL CONFESSIONAL</p>
-              <p>555 Internet Street</p>
-              <p>Web County, DC 53CR3T</p>
+    <div className="relative min-h-screen w-full p-4">
+      {/* Background with overlay */}
+      <div 
+        className="fixed inset-0"
+        style={{
+          backgroundImage: "url('/images/background.png')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          opacity: '0.6', // Adjust this value between 0 and 1
+          // Alternative: filter: 'brightness(0.6)', // Or use brightness for a different effect
+        }}
+      />
+
+      {/* Content - now relative to appear above background */}
+      <div className="relative z-10 mx-auto max-w-md p-4">
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+          <div className="border-b p-4">
+            <div className="font-mono text-center space-y-2">
+              <h1 className="text-2xl font-bold tracking-wider">KEEP THE RECEIPTS</h1>
+              <div className="text-sm">
+                <p>DIGITAL CONFESSIONAL</p>
+                <p>555 Internet Street</p>
+                <p>Web County, DC 53CR3T</p>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div 
-          id="receipt-content"
-          className="font-mono p-4 space-y-2 max-h-[400px] overflow-y-auto bg-white"
-          style={{ scrollBehavior: 'smooth' }}
-        >
-          {messages.length === 0 ? (
-            <p className="text-center text-gray-500">No messages yet</p>
-          ) : (
-            messages.map((message, index) => (
-              <div key={index} className="border-b border-dotted pb-2">
-                <div className="flex justify-between">
-                  <span>#{(index + 1).toString().padStart(3, '0')}</span>
-                  <span>${message.value.toFixed(2)}</span>
-                </div>
-                <p className="break-words">{message.text}</p>
-              </div>
-            ))
-          )}
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-4 border-t bg-gray-50">
-          <div className="flex gap-2">
-            <Input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type your message..."
-              className="font-mono"
-            />
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
+          
+          <div 
+            id="receipt-content"
+            className="font-mono p-4 space-y-2 max-h-[400px] overflow-y-auto bg-white"
+          >
+            {isLoading ? (
+              <div className="flex justify-center items-center h-20">
                 <Loader2 className="animate-spin" />
-              ) : (
-                'Add'
-              )}
-            </Button>
+              </div>
+            ) : messages.length === 0 ? (
+              <p className="text-center text-gray-500">No secrets yet</p>
+            ) : (
+              messages.map((message, index) => (
+                <div key={index} className="border-b border-dotted pb-2">
+                  <div className="flex justify-between">
+                    <span>#{(index + 1).toString().padStart(3, '0')}</span>
+                    <span>${message.value.toFixed(2)}</span>
+                  </div>
+                  <p className="break-words">{message.text}</p>
+                </div>
+              ))
+            )}
           </div>
-        </form>
+
+          <div className="border-t border-black">
+            <div className="font-mono p-4 bg-white">
+              <div className="flex justify-between items-center">
+                <div className="font-bold">TOTAL</div>
+                <div className="font-bold">${totalValue.toFixed(2)}</div>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                {messages.length} secret{messages.length !== 1 ? 's' : ''} confessed
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="p-4 border-t bg-gray-50">
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="What's your secret's worth?"
+                className="font-mono"
+                disabled={isSubmitting}
+              />
+              <Button 
+                type="submit" 
+                disabled={isSubmitting || !newMessage.trim()}
+                className={isSubmitting ? 'cursor-not-allowed' : ''}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing
+                  </>
+                ) : (
+                  'Add'
+                )}
+              </Button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   )
