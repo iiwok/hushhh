@@ -47,7 +47,7 @@ Provide the response in JSON format with:
   
       const result = JSON.parse(response.choices[0].message.content)
       return NextResponse.json(result)
-    } catch (err) {
+    } catch (err) {  // This is correct
       console.error('Analysis error:', err)
       return NextResponse.json(
         { error: 'Failed to analyze secret', details: err instanceof Error ? err.message : 'Unknown error' },

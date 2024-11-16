@@ -221,6 +221,7 @@ async function handleSecret(text: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ secret: redactedText })
   })
+  // Only destructure what we use
   const { FinancialValue } = await analysisResponse.json()
 
   return {
