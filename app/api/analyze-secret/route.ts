@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     const { secret } = await request.json()
     
     const response = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
@@ -36,25 +36,25 @@ Provide the response in JSON format with:
 - "FinancialValue": The calculated value of the secret (as a number).
 - "Analysis": A brief explanation of the factors considered.` 
 }
-      ],
-      temperature: 0.7,
-      response_format: { type: "json_object" }
-    })
+],
+temperature: 0.7,
+response_format: { type: "json_object" }
+})
 
-    if (!response.choices[0]?.message?.content) {
-        throw new Error('No response content from OpenAI')
-      }
-  
-      const result = JSON.parse(response.choices[0].message.content)
-      return NextResponse.json(result)
-    } catch (err) {  // This is correct
-      console.error('Analysis error:', err)
-      return NextResponse.json(
-        { error: 'Failed to analyze secret', details: err instanceof Error ? err.message : 'Unknown error' },
-        { status: 500 }
-      )
-    }
-  }
-  
-  export const runtime = 'edge'
-  export const dynamic = 'force-dynamic'
+if (!response.choices[0]?.message?.content) {
+throw new Error('No response content from OpenAI')
+}
+
+const result = JSON.parse(response.choices[0].message.content)
+return NextResponse.json(result)
+} catch (err) {
+console.error('Analysis error:', err)
+return NextResponse.json(
+{ error: 'Failed to analyze secret', details: err instanceof Error ? err.message : 'Unknown error' },
+{ status: 500 }
+)
+}
+}
+
+export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
